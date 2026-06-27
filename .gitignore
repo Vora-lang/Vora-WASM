@@ -1,0 +1,28 @@
+# Build artifacts
+build/
+out/
+dist/
+
+# WASM / Emscripten output (generated at build time)
+*.wasm
+*.wasm.map
+
+# Node
+node_modules/
+package-lock.json
+
+# IDE
+.vs/
+.vscode/
+.zed/
+*.swp
+*.swo
+
+# Local Claude Code guidance (never commit)
+CLAUDE.md
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
