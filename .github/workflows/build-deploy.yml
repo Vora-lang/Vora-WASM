@@ -1,0 +1,59 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Vora-WASM
+        uses: actions/checkout@v4
+
+      - name: Checkout Vora core
+        uses: actions/checkout@v4
+        with:
+          repository: Vora-lang/Vora
+          path: vora-core
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Build WASM
+        run: |
+          emcmake cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVORA_SRC_DIR="${{ github.workspace }}/vora-core/src"
+          cmake --build build
+
+      - name: Prepare www for deployment
+        run: |
+          cp build/vora_wasm.js  www/
+          cp build/vora_wasm.wasm www/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: www/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
