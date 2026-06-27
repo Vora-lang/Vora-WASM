@@ -53,6 +53,10 @@ const VoraWasm = {
     }
 };
 
+// Browser global
+if (typeof window !== 'undefined') {
+    window.VoraWasm = VoraWasm;
+}
 // Node.js CJS
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = VoraWasm;
