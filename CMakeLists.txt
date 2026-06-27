@@ -59,21 +59,22 @@ target_compile_options(vora_wasm PRIVATE
 # ============================================================================
 # Emscripten link flags
 # ============================================================================
-# These are only applied when building with the Emscripten toolchain
-# (emcmake cmake ...).  They are ignored by native compilers.
-set(EMSCRIPTEN_LINK_FLAGS
-    "-sEXPORTED_FUNCTIONS='[\"_vora_run\",\"_malloc\",\"_free\"]'"
-    "-sEXPORTED_RUNTIME_METHODS='[\"ccall\",\"cwrap\"]'"
-    "-sENVIRONMENT='web,worker'"
+# Use target_link_options — LINK_FLAGS mangles -s flags containing commas.
+target_link_options(vora_wasm PRIVATE
+    "-sEXPORTED_FUNCTIONS=[_vora_run,_malloc,_free]"
+    "-sEXPORTED_RUNTIME_METHODS=[ccall,cwrap]"
+    "-sENVIRONMENT=web,worker,node"
     "-sALLOW_MEMORY_GROWTH=1"
     "-sINITIAL_MEMORY=16MB"
     "-sMAXIMUM_MEMORY=256MB"
-    "--no-entry"
+    "-sINVOKE_RUN=0"
+    "-sEXIT_RUNTIME=0"
+    "-sMODULARIZE=1"
+    "-sSTACK_OVERFLOW_CHECK=0"
 )
 
 set_target_properties(vora_wasm PROPERTIES
     SUFFIX ".js"
-    LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS}"
 )
 
 # ============================================================================

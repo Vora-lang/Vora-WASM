@@ -1,11 +1,14 @@
 // www/vora.js — Vora WASM JavaScript wrapper
 // ============================================================================
-// Usage:
-//   <script type="module">
-//     import VoraWasm from './vora.js';
-//     await VoraWasm.init('./vora_wasm.js');
-//     const { ok, output, error } = VoraWasm.run('print("hello")');
-//   </script>
+// Usage (browser ESM):
+//   import VoraWasm from './vora.js';
+//   await VoraWasm.init('./vora_wasm.js');
+//   const { ok, output, error } = VoraWasm.run('print("hello")');
+//
+// Usage (Node.js CJS):
+//   const VoraWasm = require('./vora.js');
+//   await VoraWasm.init('./vora_wasm.js');
+//   VoraWasm.run('print("hello")');
 // ============================================================================
 
 const VoraWasm = {
@@ -17,13 +20,21 @@ const VoraWasm = {
 
     /**
      * Initialize the WASM module.
-     * @param {string} [wasmUrl='vora_wasm.js']  URL to the Emscripten JS glue
+     * @param {string} [wasmUrl='vora_wasm.js']  Path to the Emscripten JS glue
+     * @returns {Promise<void>}
      */
     async init(wasmUrl = 'vora_wasm.js') {
-        // Emscripten's modularize export: the .js file exports a factory
-        // function that returns a Promise<Module>.
-        const ModuleFactory = (await import(wasmUrl)).default;
-        this._module = await ModuleFactory();
+        // The Emscripten build uses MODULARIZE=1, which wraps the code
+        // in a factory function. The factory returns a Promise<Module>.
+        let factory;
+        if (typeof require !== 'undefined') {
+            // Node.js: require returns the factory function directly
+            factory = require(wasmUrl);
+        } else {
+            // Browser: dynamic import
+            factory = (await import(wasmUrl)).default;
+        }
+        this._module = await factory();
 
         // Wrap vora_run for fast repeated calls.
         // cwrap auto-converts string ↔ UTF-8 and handles malloc/free.
@@ -52,4 +63,8 @@ const VoraWasm = {
     }
 };
 
+// Support both ESM and CJS
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = VoraWasm;
+}
 export default VoraWasm;
