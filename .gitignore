@@ -1,11 +1,7 @@
-# Build artifacts
+# Build artifacts (keep build/ out, but www/ holds distributable WASM)
 build/
 out/
 dist/
-
-# WASM / Emscripten output (generated at build time)
-*.wasm
-*.wasm.map
 
 # Node
 node_modules/
