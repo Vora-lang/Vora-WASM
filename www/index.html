@@ -121,10 +121,67 @@
   .pane-header .dot.ok { background: var(--green); }
   .pane-header .dot.err { background: var(--red); }
 
-  textarea {
+  /* ── Editor ─────────────────────────────────────────────── */
+  .editor-wrap {
     flex: 1;
-    background: transparent;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+  }
+  .gutter {
+    width: 44px;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: #0d1117;
+    border-right: 1px solid var(--border);
+    padding: 18px 0;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    text-align: right;
+    color: var(--dim);
+    user-select: none;
+  }
+  .gutter .gl {
+    display: block;
+    padding-right: 10px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .gutter .gl.error-line {
+    color: var(--red);
+    background: rgba(248,81,73,0.1);
+    font-weight: 700;
+  }
+  .code-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  .highlight-layer {
+    position: absolute;
+    inset: 0;
+    padding: 18px 20px;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow: hidden;
     color: var(--text);
+    pointer-events: none;
+  }
+  .highlight-layer .error-line {
+    background: rgba(248,81,73,0.15);
+    display: inline-block;
+    width: 100%;
+    margin-left: -20px;
+    padding-left: 20px;
+  }
+  textarea {
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    color: transparent;
+    caret-color: #58a6ff;
     border: none;
     padding: 18px 20px;
     font-family: var(--mono);
@@ -133,8 +190,18 @@
     resize: none;
     outline: none;
     tab-size: 4;
+    z-index: 2;
+    -webkit-text-fill-color: transparent;
   }
-  textarea::placeholder { color: #30363d; }
+  textarea::placeholder { color: #30363d; -webkit-text-fill-color: #30363d; }
+
+  /* ── Syntax highlighting ────────────────────────────────── */
+  .hl-kw { color: #ff7b72; }       /* keywords */
+  .hl-str { color: #a5d6ff; }      /* strings */
+  .hl-cmt { color: #8b949e; font-style: italic; }  /* comments */
+  .hl-num { color: #79c0ff; }      /* numbers */
+  .hl-bn { color: #d2a8ff; }       /* builtins */
+  .hl-op { color: #ffa657; }       /* operators */
 
   #output {
     flex: 1;
@@ -255,7 +322,13 @@
       <span>Vora Script (.va)</span>
       <span class="dot" id="editor-dot"></span>
     </div>
-    <textarea id="code" spellcheck="false" placeholder="// Write Vora code here..."></textarea>
+    <div class="editor-wrap">
+      <div class="gutter" id="gutter"></div>
+      <div class="code-area">
+        <pre class="highlight-layer" id="highlight-layer"></pre>
+        <textarea id="code" spellcheck="false" placeholder="// Write Vora code here..."></textarea>
+      </div>
+    </div>
   </div>
   <div class="pane pane-right" id="pane-right">
     <div class="pane-header">
@@ -278,12 +351,15 @@
 <!-- ═══ Scripts ══════════════════════════════════════════════════ -->
 <script src="vora_wasm.js"></script>
 <script src="vora.js"></script>
+<script src="vora-highlight.js"></script>
 <script>
 /* ── DOM refs ─────────────────────────────────────────────────── */
 const $   = s => document.querySelector(s);
 const $$  = s => document.querySelectorAll(s);
 const codeEl   = $('#code');
 const outputEl = $('#output');
+const gutterEl = $('#gutter');
+const hlLayer  = $('#highlight-layer');
 const statusEl = $('#status');
 const statusTxt = $('#status-text');
 const statusInd = $('#status-indicator');
@@ -526,10 +602,12 @@ Object.keys(examples).forEach(name => {
   btn.textContent = name;
   btn.addEventListener('click', () => {
     codeEl.value = examples[name];
+    VoraHighlight.applyHighlight();
+    VoraHighlight.updateGutter();
+    VoraHighlight.clearErrors();
     resetOutput();
     dropMenu.classList.remove('show');
     toast('Loaded: ' + name);
-    gsap.fromTo(codeEl, { opacity: 0.3, y: 6 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
   });
   dropMenu.appendChild(btn);
 });
@@ -544,6 +622,13 @@ $('#btn-examples').addEventListener('click', (e) => {
 document.addEventListener('click', () => dropMenu.classList.remove('show'));
 
 /* ── Set initial code ─────────────────────────────────────────── */
+/* ── Bind highlighter ────────────────────────────────── */
+VoraHighlight.bind(codeEl, hlLayer, gutterEl);
+codeEl.addEventListener('input', () => VoraHighlight.updateGutter());
+codeEl.addEventListener('scroll', () => { VoraHighlight.syncScroll(); VoraHighlight.syncGutterScroll?.(); });
+codeEl.addEventListener('input', () => VoraHighlight.applyHighlight());
+window.addEventListener('resize', () => { VoraHighlight.updateGutter(); VoraHighlight.applyHighlight(); });
+
 codeEl.value = `// Vora Playground — powered by WebAssembly
 print("Hello from Vora in the browser!")
 print("1 + 1 = " + (1 + 1))
@@ -594,6 +679,7 @@ window.runCode = function() {
   if (!src) { toast('Nothing to run'); return; }
 
   resetOutput();
+  VoraHighlight.clearErrors();
   setStatus('Running…', '');
   editorDot.className = 'dot';
 
@@ -624,6 +710,7 @@ window.runCode = function() {
       outputDot.className = 'dot err';
       editorDot.className = 'dot err';
       setStatus('Error — see output.', 'err');
+      VoraHighlight.markErrors(result.error);
 
       gsap.fromTo(outputEl, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' });
       gsap.fromTo(outputEl, { x: -4 }, { x: 4, duration: 0.06, repeat: 5, yoyo: true, ease: 'power2.inOut' }); // shake
@@ -638,6 +725,10 @@ document.addEventListener('keydown', (e) => {
 
 /* ── Init WASM ────────────────────────────────────────────────── */
 (async function init() {
+  // Initial highlighting (before WASM loads)
+  VoraHighlight.applyHighlight();
+  VoraHighlight.updateGutter();
+
   try {
     await VoraWasm.init();
     setStatus('Ready — WASM module loaded.', 'ok');
