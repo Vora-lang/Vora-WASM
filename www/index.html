@@ -470,17 +470,17 @@ Obj AppError(msg, code) {
 }
 func check(value) {
     if (value == null) {
-        throw AppError("required", "value")
+        throw AppError("required", 400)
     }
     if (value < 0) {
-        throw AppError("must be positive", "value")
+        throw AppError("must be positive", 400)
     }
     return value * 2
 }
 try { print("check(10) = " + check(10)) }
 catch (e) { print("unreachable") }
 try { print("check(null) = " + check(null)) }
-catch (e) { print("Error: " + e.message + " on '" + e.field + "'") }`,
+catch (e) { print("Error: " + e.message + " (code=" + e.code + ")") }`,
 
   '30 · Closures': `// Vora examples/30-closures.va
 func makeMultiplier(factor) {
@@ -552,8 +552,7 @@ print("1 + 1 = " + (1 + 1))
 Obj Person(name, age) {
     this.name = name
     this.age = age
-    let self = this
-    this.greet = func() { return "Hi, I'm " + self.name }
+    func greet() { return "Hi, I'm " + this.name }
 }
 let p = Person("Asamo", 25)
 print(p.greet())
