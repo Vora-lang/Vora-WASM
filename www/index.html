@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vora Playground</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --accent: #e94560;
+    --green: #4ecca3;
+    --dim: #888;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  header h1 span { color: var(--accent); }
+  header .version { color: var(--dim); font-size: 0.8rem; }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  button {
+    padding: 8px 18px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.85; }
+  button:active { opacity: 0.7; }
+  button.secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .shortcut { color: var(--dim); font-size: 0.75rem; }
+
+  main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .pane-header {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .pane-left  { border-right: 1px solid var(--border); }
+
+  textarea {
+    flex: 1;
+    background: var(--bg);
+    color: var(--text);
+    border: none;
+    padding: 16px;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    resize: none;
+    outline: none;
+    tab-size: 4;
+  }
+  textarea::placeholder { color: #555; }
+
+  #output {
+    flex: 1;
+    background: var(--bg);
+    padding: 16px;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-y: auto;
+    color: var(--green);
+  }
+  #output.error { color: var(--accent); }
+
+  .status {
+    font-size: 0.75rem;
+    color: var(--dim);
+    padding: 6px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .status.ok { color: var(--green); }
+  .status.err { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Vora <span>Playground</span></h1>
+  <span class="version">v0.1.0</span>
+  <div class="toolbar">
+    <button id="btn-examples" class="secondary">Examples ▾</button>
+    <button id="btn-run" onclick="run()">Run ▶</button>
+    <span class="shortcut">Ctrl+Enter</span>
+  </div>
+</header>
+
+<main>
+  <div class="pane pane-left">
+    <div class="pane-header">Vora Script (.va)</div>
+    <textarea id="code" spellcheck="false" placeholder="// Write Vora code here...">// Vora Playground — try it out!
+print("Hello from Vora in the browser!")
+print("1 + 1 = " + (1 + 1))
+
+// Objects
+Obj Person(name, age) {
+    this.name = name
+    this.age = age
+    this.greet = func() {
+        return "Hi, I'm " + this.name
+    }
+}
+let p = Person("Asamo", 25)
+print(p.greet())
+
+// Control flow
+for (let i = 1; i <= 5; i = i + 1) {
+    print("  count: " + i)
+}
+</textarea>
+  </div>
+  <div class="pane">
+    <div class="pane-header">Output</div>
+    <pre id="output">Click <strong>Run ▶</strong> or press <strong>Ctrl+Enter</strong> to execute.</pre>
+  </div>
+</main>
+
+<div class="status" id="status">Loading Vora WASM module…</div>
+
+<!-- Emscripten glue — adjust path as needed -->
+<script type="module">
+import VoraWasm from './vora.js';
+
+const codeEl    = document.getElementById('code');
+const outputEl  = document.getElementById('output');
+const statusEl  = document.getElementById('status');
+const runBtn    = document.getElementById('btn-run');
+const examBtn   = document.getElementById('btn-examples');
+
+// ---- Init ----
+try {
+    await VoraWasm.init('./vora_wasm.js');
+    statusEl.textContent = 'Ready — WASM module loaded.';
+    statusEl.className = 'status ok';
+    runBtn.disabled = false;
+} catch (e) {
+    statusEl.textContent = 'Failed to load WASM: ' + e.message;
+    statusEl.className = 'status err';
+    runBtn.disabled = true;
+}
+
+// ---- Run ----
+window.run = function() {
+    const src = codeEl.value;
+    if (!src.trim()) return;
+
+    outputEl.textContent = '';
+    outputEl.className = '';
+    statusEl.textContent = 'Running…';
+    statusEl.className = 'status';
+
+    // Use requestAnimationFrame so the UI updates before blocking
+    requestAnimationFrame(() => {
+        try {
+            const { ok, output, error } = VoraWasm.run(src);
+            if (ok) {
+                outputEl.textContent = output || '(no output)';
+                outputEl.className = '';
+                statusEl.textContent = 'OK — execution completed.';
+                statusEl.className = 'status ok';
+            } else {
+                outputEl.textContent = error || 'Unknown error';
+                outputEl.className = 'error';
+                statusEl.textContent = 'Error — see output above.';
+                statusEl.className = 'status err';
+            }
+        } catch (e) {
+            outputEl.textContent = 'WASM bridge error: ' + e.message;
+            outputEl.className = 'error';
+            statusEl.textContent = 'Bridge error.';
+            statusEl.className = 'status err';
+        }
+    });
+};
+
+// ---- Keyboard shortcut ----
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        window.run();
+    }
+});
+
+// ---- Examples dropdown ----
+const examples = {
+    'Basics': `print("Hello from Vora!")
+print("2 + 3 = " + (2 + 3))
+print("type(42) = " + type(42))
+print("type(3.14) = " + type(3.14))
+print("type(\"hi\") = " + type("hi"))`,
+
+    'Functions': `func greet(name, greeting) {
+    greeting = greeting ?? "Hello"
+    return greeting + ", " + name + "!"
+}
+print(greet("World"))
+print(greet("Asamo", "Hi"))
+print(greet("Guest", g2 = "Welcome"))`,
+
+    'Control Flow': `for (let i = 1; i <= 10; i = i + 1) {
+    if (i % 3 == 0 && i % 5 == 0) {
+        print("FizzBuzz")
+    } else if (i % 3 == 0) {
+        print("Fizz")
+    } else if (i % 5 == 0) {
+        print("Buzz")
+    } else {
+        print(i)
+    }
+}`,
+
+    'Arrays & Dicts': `let arr = [1, 2, 3, 4, 5]
+print("arr = " + toString(arr))
+print("len(arr) = " + len(arr))
+print("arr[2] = " + arr[2])
+
+let d = {name: "Vora", year: 2026}
+print("d.name = " + d.name)
+d.version = "0.25"
+print("d.version = " + d.version)
+
+for item in arr { print("  " + item) }`,
+
+    'Objects': `Obj Counter(start) {
+    this.n = start
+    this.inc = func() { this.n = this.n + 1; return this.n }
+    this.dec = func() { this.n = this.n - 1; return this.n }
+}
+let c = Counter(0)
+print(c.inc())  // 1
+print(c.inc())  // 2
+print(c.dec())  // 1`,
+
+    'Try / Catch / Defer': `func risky(x) {
+    defer print("cleanup done")
+    if (x < 0) {
+        throw "x must be positive, got: " + x
+    }
+    return "OK: " + x
+}
+try {
+    print(risky(10))
+    print(risky(-5))
+} catch (e) {
+    print("Caught: " + e)
+}`,
+
+    'Match': `func grade(n) {
+    return match n {
+        0 => "zero"
+        1 => "one"
+        2 => "two"
+        _ => "many"
+    }
+}
+print(grade(0))
+print(grade(1))
+print(grade(5))
+print(grade(42))`
+};
+
+examBtn.addEventListener('click', () => {
+    const names = Object.keys(examples);
+    const choice = prompt(
+        'Choose an example:\n\n' +
+        names.map((n, i) => (i+1) + '. ' + n).join('\n') +
+        '\n\nType a number or name:'
+    );
+    const idx = parseInt(choice, 10);
+    const key = (idx >= 1 && idx <= names.length) ? names[idx-1] : choice;
+    if (examples[key]) {
+        codeEl.value = examples[key];
+        outputEl.textContent = '';
+        outputEl.className = '';
+        statusEl.textContent = 'Loaded example: ' + key;
+        statusEl.className = 'status';
+    } else if (choice !== null) {
+        alert('Unknown example: ' + choice);
+    }
+});
+</script>
+</body>
+</html>
