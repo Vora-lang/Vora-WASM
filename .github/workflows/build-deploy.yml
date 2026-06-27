@@ -45,6 +45,7 @@ jobs:
         run: |
           cp build/vora_wasm.js  www/
           cp build/vora_wasm.wasm www/
+          cp vora_logo.svg        www/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
