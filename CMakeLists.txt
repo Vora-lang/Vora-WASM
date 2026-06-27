@@ -11,6 +11,9 @@ if(NOT DEFINED VORA_SRC_DIR)
     set(VORA_SRC_DIR "${VORA_ROOT}/src")
 endif()
 
+# VORA_ROOT is one level above VORA_SRC_DIR (the Vora repo root)
+get_filename_component(VORA_ROOT "${VORA_SRC_DIR}" DIRECTORY)
+
 message(STATUS "Vora source directory: ${VORA_SRC_DIR}")
 message(STATUS "Vora include directory: ${VORA_ROOT}/include")
 
