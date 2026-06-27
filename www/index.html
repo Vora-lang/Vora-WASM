@@ -552,7 +552,8 @@ print("1 + 1 = " + (1 + 1))
 Obj Person(name, age) {
     this.name = name
     this.age = age
-    this.greet = func() { return "Hi, I'm " + this.name }
+    let self = this
+    this.greet = func() { return "Hi, I'm " + self.name }
 }
 let p = Person("Asamo", 25)
 print(p.greet())
